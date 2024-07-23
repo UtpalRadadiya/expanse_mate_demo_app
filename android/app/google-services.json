@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "223830051255",
+    "project_id": "expanse-mate-demo-app",
+    "storage_bucket": "expanse-mate-demo-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:223830051255:android:c4ca865f344e7774a14032",
+        "android_client_info": {
+          "package_name": "com.example.expanse_mate_demo_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQxbvzHWr_Nyhiv1_OLb8YAo-O-iJDWrk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
