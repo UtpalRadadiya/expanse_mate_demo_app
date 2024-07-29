@@ -1,0 +1,30 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "expanse-mate-demo-app",
+          "appId": "1:223830051255:android:c4ca865f344e7774a14032",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "expanse-mate-demo-app",
+          "appId": "1:223830051255:ios:ee294407e6ced6a6a14032",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "expanse-mate-demo-app",
+          "configurations": {
+            "android": "1:223830051255:android:c4ca865f344e7774a14032",
+            "ios": "1:223830051255:ios:ee294407e6ced6a6a14032"
+          }
+        }
+      }
+    }
+  }
+}
