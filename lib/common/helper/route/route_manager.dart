@@ -1,4 +1,5 @@
 import 'package:expanse_mate_demo_app/common/consts/app_routes.dart';
+import 'package:expanse_mate_demo_app/profile/ui/dashboard.dart';
 import 'package:expanse_mate_demo_app/profile/ui/expanse_profile_screen.dart';
 import 'package:flutter/material.dart';
 
@@ -11,9 +12,16 @@ class AppRouteManager {
     switch (settings.name) {
       case AppRoutes.expanseProfilePage:
         return MaterialPageRoute(
-          builder: (context) => const ExpanseProfilePage(),
+          builder: (context) => ExpanseProfilePage(index: args?['index'] ?? 0),
           settings: const RouteSettings(
             name: AppRoutes.expanseProfilePage,
+          ),
+        );
+      case AppRoutes.dashboard:
+        return MaterialPageRoute(
+          builder: (context) => const Dashboard(),
+          settings: const RouteSettings(
+            name: AppRoutes.dashboard,
           ),
         );
     }

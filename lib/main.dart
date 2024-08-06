@@ -1,5 +1,6 @@
+import 'package:expanse_mate_demo_app/common/helper/route/route_manager.dart';
 import 'package:expanse_mate_demo_app/firebase_options.dart';
-import 'package:expanse_mate_demo_app/profile/ui/home.dart';
+import 'package:expanse_mate_demo_app/profile/ui/dashboard.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -34,11 +35,13 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
+      navigatorKey: AppRouteManager.navigatorKey,
+      onGenerateRoute: AppRouteManager.onGenerateRoute,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: const Dashboard(),
     );
   }
 }

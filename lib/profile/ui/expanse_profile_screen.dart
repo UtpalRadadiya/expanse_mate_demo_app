@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:rxdart/rxdart.dart';
 
 class ExpanseProfilePage extends StatefulWidget {
-  const ExpanseProfilePage({Key? key}) : super(key: key);
+  ExpanseProfilePage({super.key, this.index});
+  int? index;
 
   @override
   State<ExpanseProfilePage> createState() => _ExpanseProfilePageState();
@@ -16,6 +17,9 @@ class _ExpanseProfilePageState extends State<ExpanseProfilePage> {
   @override
   void initState() {
     super.initState();
+    if (widget.index == 1) {
+      currentIndex = widget.index!;
+    }
     tabChangeStreamSubject = BehaviorSubject<int>.seeded(currentIndex);
   }
 
