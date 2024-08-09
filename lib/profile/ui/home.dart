@@ -24,6 +24,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _homePageBloc.fetchExpenses(limit: 3);
     _homePageBloc.fetchCategoryDetails();
+    _homePageBloc.fetchMonthlyData();
     _homePageBloc.fetchCategoryWiseData();
   }
 
@@ -173,7 +174,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                     child: StreamBuilder<bool>(
                         stream: _homePageBloc.showIncome,
-                        // initialData: _homePageBloc.showIncome.value,
                         builder: (context, snapshot) {
                           return Column(
                             children: [
@@ -192,6 +192,7 @@ class _HomePageState extends State<HomePage> {
                                     value: _homePageBloc.showIncome.value,
                                     onChanged: (value) {
                                       _homePageBloc.showIncome.add(value);
+                                      _homePageBloc.fetchMonthlyData();
                                     },
                                     activeColor: const Color(0xff4EBDA4),
                                     activeThumbImage: const NetworkImage(
@@ -210,283 +211,15 @@ class _HomePageState extends State<HomePage> {
                               Expanded(
                                   child: CustomChart(
                                 showIncome: _homePageBloc.showIncome.value,
+                                homePageBloc: _homePageBloc,
                               )),
                             ],
                           );
                         })),
                 const SizedBox(height: 16),
-                StreamBuilder<List<BarChartGroupData>>(
-                  stream: _homePageBloc.categoryWiseData,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return const Center(child: Text('No data available.'));
-                    }
-
-                    return Container(
-                      height: 300,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        color: Colors.white,
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.grey,
-                            blurRadius: 10.0,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Category wise chart',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Expanded(
-                            child: StreamBuilder<num>(
-                                stream: _homePageBloc.maxExpenseIncomeValue,
-                                builder: (context, maxSnapshot) {
-                                  var maxY = maxSnapshot.data?.toDouble() ?? 0.0;
-
-                                  return BarChart(
-                                    BarChartData(
-                                      barGroups: snapshot.data!,
-                                      borderData: FlBorderData(
-                                        show: false,
-                                      ),
-                                      alignment: BarChartAlignment.spaceBetween,
-                                      gridData: const FlGridData(drawVerticalLine: false),
-                                      barTouchData: BarTouchData(),
-                                      minY: 0,
-                                      maxY: maxY,
-                                      titlesData: FlTitlesData(
-                                        bottomTitles: AxisTitles(
-                                          sideTitles: SideTitles(
-                                            showTitles: true,
-                                            reservedSize: 30,
-                                            getTitlesWidget: (double value, meta) {
-                                              String categoryId = _homePageBloc.categoryDetails.keys
-                                                  .elementAt(value.toInt());
-                                              return SizedBox(
-                                                width: 60,
-                                                child: Padding(
-                                                  padding: const EdgeInsets.only(right: 10),
-                                                  child: Text(
-                                                    _homePageBloc.categoryDetails[categoryId]!['name']!,
-                                                    textAlign: TextAlign.center,
-                                                    style: const TextStyle(fontSize: 10),
-                                                    maxLines: 2,
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        leftTitles: AxisTitles(
-                                          sideTitles: SideTitles(
-                                            showTitles: true,
-                                            reservedSize: 40,
-                                            getTitlesWidget: (double value, TitleMeta meta) {
-                                              return Text(
-                                                value.toInt().toString(),
-                                                style: const TextStyle(
-                                                  color: Colors.black,
-                                                  fontSize: 10,
-                                                ),
-                                              );
-                                            },
-                                            interval: maxY / 5,
-                                          ),
-                                        ),
-                                        topTitles: const AxisTitles(
-                                          sideTitles: SideTitles(showTitles: false),
-                                        ),
-                                        show: true,
-                                        rightTitles: const AxisTitles(
-                                          sideTitles: SideTitles(showTitles: false),
-                                        ),
-                                      ),
-                                      // gridData: const FlGridData(show: false),
-                                    ),
-                                  );
-                                }),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                categoryWiseBarData(),
                 const SizedBox(height: 16),
-                StreamBuilder(
-                  stream: _homePageBloc.seeMore,
-                  builder: (context, snapshot) {
-                    return StreamBuilder<List<ExpanseIncomeModel>>(
-                        stream: _homePageBloc.expenses,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
-                          } else if (snapshot.hasError) {
-                            return Center(child: Text('Error: ${snapshot.error}'));
-                          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                            return const Center(child: Text('No expenses found.'));
-                          }
-                          List<ExpanseIncomeModel> expenses = snapshot.data!;
-
-                          return Container(
-                            margin: const EdgeInsets.only(left: 16, right: 16, top: 10, bottom: 50),
-                            height: _homePageBloc.seeMore.value ? 372 : 272,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              color: Colors.white,
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.grey,
-                                  blurRadius: 10.0,
-                                ), //BoxShadow
-                                //BoxShadow
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Column(children: [
-                                const Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Expenses',
-                                      style: TextStyle(fontSize: 16),
-                                    ),
-                                    Icon(Icons.menu)
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  child: Divider(
-                                    height: 0,
-                                    color: Colors.grey,
-                                    thickness: 0,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'This Month',
-                                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                SizedBox(
-                                  height: _homePageBloc.seeMore.value ? 250 : 150,
-                                  child: ListView.builder(
-                                    physics: _homePageBloc.seeMore.value
-                                        ? const BouncingScrollPhysics()
-                                        : const NeverScrollableScrollPhysics(),
-                                    itemCount: expenses.length,
-                                    padding: EdgeInsets.zero,
-                                    itemBuilder: (context, index) {
-                                      var expense = expenses[index];
-                                      String categoryID = expense.categoryId;
-                                      String categoryName =
-                                          _homePageBloc.categoryDetails[categoryID]?['name'] ?? '';
-                                      String categoryIcon =
-                                          _homePageBloc.categoryDetails[categoryID]?['icon'] ?? '';
-
-                                      return Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            color: Colors.red,
-                                            padding:
-                                                const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-                                            child: Image.network(
-                                              categoryIcon,
-                                              height: 24,
-                                              width: 20,
-                                              fit: BoxFit.cover,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                categoryName,
-                                                style: const TextStyle(fontSize: 12),
-                                              ),
-                                              const Text(
-                                                'Cash',
-                                                style: TextStyle(fontSize: 12, color: Colors.grey),
-                                              ),
-                                              if (expenses.isNotEmpty)
-                                                Text(
-                                                  expenses[index].note,
-                                                  style:
-                                                      const TextStyle(fontSize: 12, color: Colors.grey),
-                                                ),
-                                            ],
-                                          ),
-                                          const Spacer(),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            mainAxisAlignment: MainAxisAlignment.start,
-                                            children: [
-                                              Text('₹${expense.payment}',
-                                                  style:
-                                                      const TextStyle(fontSize: 16, color: Colors.red)),
-                                              Text(
-                                                _homePageBloc.formatDate(expense.date),
-                                                style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                StreamBuilder<bool>(
-                                  stream: _homePageBloc.seeMore,
-                                  builder: (context, snapshot) {
-                                    if (!snapshot.hasData) return const SizedBox.shrink();
-                                    bool showAll = snapshot.data!;
-                                    return Align(
-                                      alignment: Alignment.centerRight,
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          _homePageBloc.toggleSeeMore();
-                                        },
-                                        child: Text(
-                                          showAll ? 'See less' : 'See more',
-                                          style: const TextStyle(color: Color(0xff4EBDA4)),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ]),
-                            ),
-                          );
-                        });
-                  },
-                ),
+                thisMonthExpense(),
               ],
             ),
           ],
@@ -520,6 +253,278 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget thisMonthExpense() {
+    return StreamBuilder(
+      stream: _homePageBloc.seeMore,
+      builder: (context, snapshot) {
+        return StreamBuilder<List<ExpanseIncomeModel>>(
+            stream: _homePageBloc.expenses,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(child: Text('No expenses found.'));
+              }
+              List<ExpanseIncomeModel> expenses = snapshot.data!;
+
+              return Container(
+                margin: const EdgeInsets.only(left: 16, right: 16, top: 10, bottom: 50),
+                height: _homePageBloc.seeMore.value ? 372 : 272,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white,
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.grey,
+                      blurRadius: 10.0,
+                    ), //BoxShadow
+                    //BoxShadow
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(children: [
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Expenses',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        Icon(Icons.menu)
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Divider(
+                        height: 0,
+                        color: Colors.grey,
+                        thickness: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Text(
+                            'This Month',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: _homePageBloc.seeMore.value ? 250 : 150,
+                      child: ListView.builder(
+                        physics: _homePageBloc.seeMore.value
+                            ? const BouncingScrollPhysics()
+                            : const NeverScrollableScrollPhysics(),
+                        itemCount: expenses.length,
+                        padding: EdgeInsets.zero,
+                        itemBuilder: (context, index) {
+                          var expense = expenses[index];
+                          String categoryID = expense.categoryId;
+                          String categoryName = _homePageBloc.categoryDetails[categoryID]?['name'] ?? '';
+                          String categoryIcon = _homePageBloc.categoryDetails[categoryID]?['icon'] ?? '';
+
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                color: Colors.red,
+                                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+                                child: Image.network(
+                                  categoryIcon,
+                                  height: 24,
+                                  width: 20,
+                                  fit: BoxFit.cover,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    categoryName,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  const Text(
+                                    'Cash',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                  if (expenses.isNotEmpty)
+                                    Text(
+                                      expenses[index].note,
+                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                ],
+                              ),
+                              const Spacer(),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  Text('₹${expense.payment}',
+                                      style: const TextStyle(fontSize: 16, color: Colors.red)),
+                                  Text(
+                                    _homePageBloc.formatDate(expense.date),
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    StreamBuilder<bool>(
+                      stream: _homePageBloc.seeMore,
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) return const SizedBox.shrink();
+                        bool showAll = snapshot.data!;
+                        return Align(
+                          alignment: Alignment.centerRight,
+                          child: GestureDetector(
+                            onTap: () {
+                              _homePageBloc.toggleSeeMore();
+                            },
+                            child: Text(
+                              showAll ? 'See less' : 'See more',
+                              style: const TextStyle(color: Color(0xff4EBDA4)),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ]),
+                ),
+              );
+            });
+      },
+    );
+  }
+
+  Widget categoryWiseBarData() {
+    return StreamBuilder<List<BarChartGroupData>>(
+      stream: _homePageBloc.categoryWiseData,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('No data available.'));
+        }
+
+        return Container(
+          height: 300,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white,
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.grey,
+                blurRadius: 10.0,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Category wise chart',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: StreamBuilder<num>(
+                    stream: _homePageBloc.maxExpenseIncomeValue,
+                    builder: (context, maxSnapshot) {
+                      var maxY = maxSnapshot.data?.toDouble() ?? 0.0;
+
+                      return BarChart(
+                        BarChartData(
+                          barGroups: snapshot.data!,
+                          borderData: FlBorderData(
+                            show: false,
+                          ),
+                          alignment: BarChartAlignment.spaceBetween,
+                          gridData: const FlGridData(drawVerticalLine: false),
+                          barTouchData: BarTouchData(),
+                          minY: 0,
+                          maxY: maxY,
+                          titlesData: FlTitlesData(
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 30,
+                                getTitlesWidget: (double value, meta) {
+                                  String categoryId =
+                                      _homePageBloc.categoryDetails.keys.elementAt(value.toInt());
+                                  return SizedBox(
+                                    width: 60,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 10),
+                                      child: Text(
+                                        _homePageBloc.categoryDetails[categoryId]!['name']!,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 10),
+                                        maxLines: 2,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 40,
+                                getTitlesWidget: (double value, TitleMeta meta) {
+                                  return Text(
+                                    value.toInt().toString(),
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 10,
+                                    ),
+                                  );
+                                },
+                                interval: maxY / 5,
+                              ),
+                            ),
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            show: true,
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                          ),
+                          // gridData: const FlGridData(show: false),
+                        ),
+                      );
+                    }),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

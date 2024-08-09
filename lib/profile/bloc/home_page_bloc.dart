@@ -17,10 +17,67 @@ class HomePageBloc extends BaseBloc {
 
   var categoryWiseData = BehaviorSubject<List<BarChartGroupData>>.seeded([]);
   var maxExpenseIncomeValue = BehaviorSubject<num>.seeded(0);
+  var maxPayment = BehaviorSubject<num>.seeded(1);
+  var lineChartData = BehaviorSubject<List<FlSpot>>.seeded([]);
+  // var barChartData = BehaviorSubject<List<BarChartGroupData>>.seeded([]);
 
   void toggleSeeMore() {
     seeMore.add(!seeMore.value);
     fetchExpenses(limit: seeMore.value ? null : 3);
+  }
+
+  Future<void> fetchMonthlyData() async {
+    try {
+      DateTime now = DateTime.now();
+      DateTime firstDayOfCurrentMonth = DateTime(now.year, now.month, 1);
+
+      QuerySnapshot snapshot = await _fireStore
+          .collection('expanse_income')
+          .where('date', isGreaterThanOrEqualTo: firstDayOfCurrentMonth.toIso8601String())
+          .where('date', isLessThanOrEqualTo: now.toIso8601String())
+          .get();
+
+      List<ExpanseIncomeModel> fetchedData =
+          snapshot.docs.map((doc) => ExpanseIncomeModel.fromDocument(doc)).toList();
+
+      Map<String, double> dailyTotals = {};
+      double maxPaymentValue = 0;
+
+      // Initialize daily totals for each day in the month
+      for (int i = 0; i <= now.day - 1; i++) {
+        String dateKey = DateFormat('yyyy-MM-dd').format(firstDayOfCurrentMonth.add(Duration(days: i)));
+        dailyTotals[dateKey] = 0;
+      }
+
+      // Calculate totals
+      for (var data in fetchedData) {
+        String type = data.type;
+        double payment = data.payment.toDouble();
+
+        if (showIncome.value && type != 'income') continue;
+        if (!showIncome.value && type != 'expense') continue;
+
+        String dateKey = DateFormat('yyyy-MM-dd').format(DateTime.parse(data.date));
+        dailyTotals[dateKey] = dailyTotals[dateKey]! + payment;
+
+        if (dailyTotals[dateKey]! > maxPaymentValue) {
+          maxPaymentValue = dailyTotals[dateKey]!;
+        }
+      }
+
+      // Create FlSpot list for LineChart
+      List<FlSpot> spots = [];
+      int index = 0;
+      dailyTotals.forEach((date, total) {
+        spots.add(FlSpot(index.toDouble(), total));
+        index++;
+      });
+
+      maxPayment.add(maxPaymentValue);
+      lineChartData.add(spots);
+    } catch (e) {
+      print('Error fetching monthly data: $e');
+    }
   }
 
   Future<void> fetchExpenses({int? limit}) async {

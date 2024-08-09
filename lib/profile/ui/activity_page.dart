@@ -21,16 +21,16 @@ class _ActivityPageState extends BaseState<ActivityPage> {
   String categoryIcon = '';
   RangeValues amountRange = const RangeValues(0, 100000);
   DateTimeRange dateRange = DateTimeRange(
-    start: DateTime.now().subtract(const Duration(days: 7)),
+    start: DateTime.now(),
     end: DateTime.now(),
   );
 
   @override
   void initState() {
+    _activityBloc.generateDatesForPreviousYears();
     super.initState();
     _activityBloc.fetchExpenses();
     _activityBloc.fetchCategoryDetails();
-    _activityBloc.generateDatesForCurrentMonth();
   }
 
   @override
@@ -39,19 +39,25 @@ class _ActivityPageState extends BaseState<ActivityPage> {
       appBar: appBar(),
       body: StreamBuilder(
           stream: _activityBloc.selectedDateSubject,
-          builder: (context, snapshot) {
-            return Column(
-              children: [
-                dateRow(),
-                const SizedBox(height: 20),
-                resetButton(),
-                const SizedBox(height: 20),
-                sortOrFilterRow(),
-                const SizedBox(height: 20),
-                Expanded(child: expenseList()),
-                const SizedBox(height: 20),
-              ],
-            );
+          builder: (context, dateSnapshot) {
+            return StreamBuilder<List<ExpanseIncomeModel>>(
+                stream: dateSnapshot.data != null
+                    ? _activityBloc.selectedDateExpensesSubject
+                    : _activityBloc.expensesSubject,
+                builder: (context, snapshot) {
+                  return Column(
+                    children: [
+                      dateRow(),
+                      if (_activityBloc.datesSubject.value.isNotEmpty) const SizedBox(height: 20),
+                      resetButton(),
+                      const SizedBox(height: 20),
+                      sortOrFilterRow(),
+                      const SizedBox(height: 20),
+                      Expanded(child: expenseList()),
+                      const SizedBox(height: 20),
+                    ],
+                  );
+                });
           }),
     );
   }
@@ -68,10 +74,7 @@ class _ActivityPageState extends BaseState<ActivityPage> {
             return isDateSelected
                 ? ElevatedButton(
                     onPressed: () {
-                      // _activityBloc.clearFiltersAndSorts();
-                      // _activityBloc.selectDate(null);
-                      // _activityBloc.fetchExpenses();
-                      _clearSortAndFilter();
+                      _activityBloc.selectDate(null);
                     },
                     child: const Text('Reset Date'),
                   )
@@ -143,7 +146,7 @@ class _ActivityPageState extends BaseState<ActivityPage> {
                                     _activityBloc.selectDate(date);
                                   },
                             child: Text(
-                              DateFormat('dd MMM').format(date),
+                              DateFormat('dd MMM yyyy').format(date),
                               style: TextStyle(
                                 color: isSelected
                                     ? Colors.red
@@ -168,85 +171,17 @@ class _ActivityPageState extends BaseState<ActivityPage> {
     );
   }
 
-  // Widget dateRow() {
-  //   return StreamBuilder<List<DateTime>>(
-  //     stream: _activityBloc.datesSubject,
-  //     builder: (context, snapshot) {
-  //       if (snapshot.hasData) {
-  //         List<DateTime> dates = snapshot.data!;
-  //         DateTime today = DateTime.now();
-  //
-  //         return SingleChildScrollView(
-  //           scrollDirection: Axis.horizontal,
-  //           child: ColoredBox(
-  //             color: const Color(0xffEFEFEF),
-  //             child: Row(
-  //               children: [
-  //                 Container(
-  //                   margin: const EdgeInsets.symmetric(horizontal: 26, vertical: 8),
-  //                   child: GestureDetector(
-  //                     onTap: () {
-  //                       _activityBloc.selectDate(null);
-  //                     },
-  //                     child: const Text(
-  //                       'Reset Date',
-  //                       style: TextStyle(
-  //                         color: Colors.red,
-  //                         fontWeight: FontWeight.bold,
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ),
-  //                 ...dates.map((date) {
-  //                   bool isFutureDate = date.isAfter(today);
-  //                   return StreamBuilder<DateTime?>(
-  //                     stream: _activityBloc.selectedDateSubject,
-  //                     builder: (context, selectedSnapshot) {
-  //                       bool isSelected = selectedSnapshot.data == date;
-  //
-  //                       return Container(
-  //                         margin: const EdgeInsets.symmetric(horizontal: 26, vertical: 8),
-  //                         child: GestureDetector(
-  //                           onTap: isFutureDate
-  //                               ? null
-  //                               : () {
-  //                                   _activityBloc.selectDate(date);
-  //                                 },
-  //                           child: Text(
-  //                             DateFormat('dd MMM').format(date),
-  //                             style: TextStyle(
-  //                               color: isSelected
-  //                                   ? Colors.red
-  //                                   : isFutureDate
-  //                                       ? Colors.grey
-  //                                       : Colors.black,
-  //                             ),
-  //                           ),
-  //                         ),
-  //                       );
-  //                     },
-  //                   );
-  //                 }),
-  //               ],
-  //             ),
-  //           ),
-  //         );
-  //       } else if (snapshot.hasError) {
-  //         return Center(child: Text('Error: ${snapshot.error}'));
-  //       } else {
-  //         return const Center(child: CircularProgressIndicator());
-  //       }
-  //     },
-  //   );
-  // }
-
   Widget expenseList() {
     return StreamBuilder<List<ExpanseIncomeModel>>(
-      // stream: _activityBloc.expensesSubject,
       stream: _activityBloc.selectedDateSubject.hasValue
           ? _activityBloc.selectedDateExpensesSubject
           : _activityBloc.expensesSubject,
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.data?.isEmpty ?? true) {
+          return const Center(child: Text('No Data Available'));
+        }
         if (snapshot.hasData) {
           List<ExpanseIncomeModel> expenses = snapshot.data!;
 
@@ -265,23 +200,74 @@ class _ActivityPageState extends BaseState<ActivityPage> {
             itemBuilder: (context, index) {
               ExpanseIncomeModel expense = expenses[index];
               String categoryID = expense.categoryId;
+              String type = expense.type;
               categoryName = _activityBloc.categoryDetails[categoryID]?['name'] ?? '';
               categoryIcon = _activityBloc.categoryDetails[categoryID]?['icon'] ?? '';
+              DateTime expenseDate = DateTime.parse(expense.date);
+              String formattedDate = _activityBloc.formatDate(expenseDate);
+
               return ListTile(
                 title: Text(categoryName),
-                subtitle: Text(expense.date),
-                leading: Container(
-                  color: Colors.red,
-                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-                  child: Image.network(
-                    categoryIcon,
-                    height: 24,
-                    width: 20,
-                    fit: BoxFit.cover,
-                    color: Colors.white,
+                subtitle: Text(
+                  formattedDate,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xff4EBDA4),
                   ),
                 ),
-                trailing: Text('\$${expense.payment.toString()}'),
+                leading: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: type == 'expense' ? Colors.red : const Color(0xff4EBDA4),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+                      child: Image.network(
+                        categoryIcon,
+                        height: 24,
+                        width: 20,
+                        fit: BoxFit.cover,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -15,
+                      right: -10,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          // shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(30),
+                          color: Colors.red,
+                          border: Border.all(
+                            color: Colors.white,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(30),
+                          child: Image.network(
+                            'https://img.lovepik.com/element/45001/3052.png_860.png',
+                            height: 28,
+                            width: 28,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                trailing: Text(
+                  type == 'expense'
+                      ? '\$-${expense.payment.toString()}'
+                      : '\$${expense.payment.toString()}',
+                  style: TextStyle(
+                    color: type == 'expense' ? Colors.red : const Color(0xff4EBDA4),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               );
             },
           );
@@ -313,6 +299,9 @@ class _ActivityPageState extends BaseState<ActivityPage> {
               child: GestureDetector(
                 onTap: () {
                   _activityBloc.selectionSubject.add(Selection.sort);
+                  if (_activityBloc.selectionSubject.value == Selection.sort) {
+                    _activityBloc.fetchExpenses();
+                  }
                   _showSortBottomSheet();
                 },
                 child: StreamBuilder<Selection>(
@@ -325,7 +314,10 @@ class _ActivityPageState extends BaseState<ActivityPage> {
                       children: [
                         SvgPicture.asset(
                           AppImage.icSort.path(),
-                          color: isSelected ? const Color(0xff4EBDA4) : Colors.black,
+                          colorFilter: ColorFilter.mode(
+                            isSelected ? const Color(0xff4EBDA4) : Colors.black,
+                            BlendMode.srcIn,
+                          ),
                         ),
                         const SizedBox(width: 5),
                         Text(
@@ -350,7 +342,10 @@ class _ActivityPageState extends BaseState<ActivityPage> {
               child: GestureDetector(
                 onTap: () {
                   _activityBloc.selectionSubject.add(Selection.filter);
-                  _showSortBottomSheet();
+                  if (_activityBloc.selectionSubject.value == Selection.filter) {
+                    _activityBloc.fetchExpenses();
+                  }
+                  _showFilterBottomSheet();
                 },
                 child: StreamBuilder<Selection>(
                   stream: _activityBloc.selectionSubject,
@@ -362,7 +357,10 @@ class _ActivityPageState extends BaseState<ActivityPage> {
                       children: [
                         SvgPicture.asset(
                           AppImage.icFilter.path(),
-                          color: isSelected ? const Color(0xff4EBDA4) : Colors.black,
+                          colorFilter: ColorFilter.mode(
+                            isSelected ? const Color(0xff4EBDA4) : Colors.black,
+                            BlendMode.srcIn,
+                          ),
                         ),
                         const SizedBox(width: 5),
                         Text(
@@ -395,73 +393,178 @@ class _ActivityPageState extends BaseState<ActivityPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 20),
-              const Text('Select Amount Range'),
-              StreamBuilder<RangeValues>(
-                  stream: _activityBloc.amountRangeSubject,
-                  builder: (context, snapshot) {
-                    return RangeSlider(
-                      values: amountRange,
-                      min: 0,
-                      max: 100000,
-                      divisions: 200,
-                      labels: RangeLabels(
-                        amountRange.start.round().toString(),
-                        amountRange.end.round().toString(),
+              const Text('Sort By'),
+              const SizedBox(height: 10),
+              StreamBuilder<SortCriteria>(
+                stream: _activityBloc.sortCriteriaController,
+                builder: (context, snapshot) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      RadioListTile<SortCriteria>(
+                        title: const Text('Amount'),
+                        value: SortCriteria.amount,
+                        groupValue: snapshot.data,
+                        onChanged: (SortCriteria? value) {
+                          if (value != null) {
+                            _activityBloc.setSortCriteria(value);
+                          }
+                        },
                       ),
-                      onChanged: (values) {
-                        setState(() {
-                          amountRange = values;
-                          _activityBloc.setAmountRange(values);
-                        });
-                      },
-                    );
-                  }),
-              const Text('Select Date Range'),
-              const SizedBox(height: 20),
-              StreamBuilder<DateTimeRange>(
-                  stream: _activityBloc.dateRangeSubject,
-                  builder: (context, snapshot) {
-                    var data = snapshot.data;
-                    return ElevatedButton(
-                      onPressed: () async {
-                        DateTimeRange? picked = await showDateRangePicker(
-                          context: context,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2101),
-                          initialDateRange: dateRange,
-                        );
-                        if (picked != null && picked != dateRange) {
-                          setState(() {
-                            dateRange = picked;
-                            _activityBloc.setDateRange(picked);
-                          });
-                        }
-                      },
-                      child: Text(
-                          '${DateFormat('dd MMM yyyy').format(data?.start ?? DateTime.now())} - ${DateFormat('dd MMM yyyy').format(data?.end ?? DateTime.now())}'),
-                    );
-                  }),
+                      RadioListTile<SortCriteria>(
+                        title: const Text('Date Range'),
+                        value: SortCriteria.dateRange,
+                        groupValue: snapshot.data,
+                        onChanged: (SortCriteria? value) {
+                          if (value != null) {
+                            _activityBloc.setSortCriteria(value);
+                          }
+                        },
+                      ),
+                      RadioListTile<SortCriteria>(
+                        title: const Text('Category'),
+                        value: SortCriteria.category,
+                        groupValue: snapshot.data,
+                        onChanged: (SortCriteria? value) {
+                          if (value != null) {
+                            _activityBloc.setSortCriteria(value);
+                          }
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  _showCategoryDropdown(context);
+                  _activityBloc.fetchSortedItems();
+                  Navigator.pop(context);
                 },
-                child: Text(
-                  _activityBloc.selectedCategory.valueOrNull?.name ?? 'Select Category',
+                child: const Text('Sort Apply'),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  // _clearSortAndFilter();
+                  resetAndFetchData();
+                  Navigator.pop(context);
+                },
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.clear_all,
+                      color: Colors.red,
+                    ),
+                    SizedBox(width: 5),
+                    Text(
+                      'Clear Data',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 20),
+              const Text('Select Amount Range'),
+              StreamBuilder<RangeValues>(
+                stream: _activityBloc.amountRangeSubject,
+                builder: (context, snapshot) {
+                  return RangeSlider(
+                    values: amountRange,
+                    min: 0,
+                    max: 100000,
+                    divisions: 200,
+                    labels: RangeLabels(
+                      amountRange.start.round().toString(),
+                      amountRange.end.round().toString(),
+                    ),
+                    onChanged: (values) {
+                      setState(() {
+                        amountRange = values;
+                        _activityBloc.setAmountRange(values);
+                      });
+                    },
+                  );
+                },
+              ),
+              const Text('Select Date Range'),
+              const SizedBox(height: 20),
+              StreamBuilder<DateTimeRange>(
+                stream: _activityBloc.dateRangeSubject,
+                builder: (context, snapshot) {
+                  var data = snapshot.data;
+                  return ElevatedButton(
+                    onPressed: () async {
+                      DateTimeRange? picked = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2101),
+                        initialDateRange: dateRange,
+                      );
+                      if (picked != null && picked != dateRange) {
+                        setState(() {
+                          dateRange = picked;
+                          _activityBloc.setDateRange(picked);
+                        });
+                      }
+                    },
+                    child: Text(
+                      '${DateFormat('dd MMM yyyy').format(data?.start ?? DateTime.now())} - ${DateFormat('dd MMM yyyy').format(data?.end ?? DateTime.now())}',
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              StreamBuilder(
+                  stream: _activityBloc.selectedCategorySubject,
+                  builder: (context, snapshot) {
+                    return ElevatedButton(
+                      onPressed: () {
+                        _showCategoryDropdown(context);
+                      },
+                      child: Text(
+                        _activityBloc.selectedCategorySubject.value?.name ?? 'Select Category',
+                      ),
+                    );
+                  }),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
+                  // _activityBloc.fetchSortedItems();
+                  _applyFilter();
                   Navigator.pop(context);
-                  _applySorting();
                 },
-                child: const Text('Apply'),
+                child: const Text('Filter Apply'),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  _clearSortAndFilter();
+                  // _clearSortAndFilter();
+                  resetAndFetchData();
+                  Navigator.pop(context);
                 },
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -498,7 +601,7 @@ class _ActivityPageState extends BaseState<ActivityPage> {
         return AlertDialog(
           title: const Text('Select Category'),
           content: DropdownButton<CategoryModel>(
-            value: _activityBloc.selectedCategory.valueOrNull,
+            value: _activityBloc.selectedCategorySubject.valueOrNull,
             items: _activityBloc.category.valueOrNull?.map((category) {
               return DropdownMenuItem<CategoryModel>(
                 value: category,
@@ -515,9 +618,7 @@ class _ActivityPageState extends BaseState<ActivityPage> {
               );
             }).toList(),
             onChanged: (CategoryModel? newValue) {
-              setState(() {
-                _activityBloc.selectedCategory.value = newValue;
-              });
+              _activityBloc.selectedCategorySubject.value = newValue;
               Navigator.of(context).pop();
             },
           ),
@@ -526,18 +627,21 @@ class _ActivityPageState extends BaseState<ActivityPage> {
     );
   }
 
-  void _applySorting() {
+  void _applyFilter() {
     _activityBloc.applyFilters();
     expenseList();
   }
 
   void _clearSortAndFilter() {
     _activityBloc.amountRangeSubject.add(const RangeValues(0, 100000));
-    _activityBloc.dateRangeSubject.add(DateTimeRange(start: DateTime(1900), end: DateTime.now()));
-    _activityBloc.selectedCategory.add(null);
-    _activityBloc.selectDate(null);
+    _activityBloc.dateRangeSubject.add(DateTimeRange(start: DateTime.now(), end: DateTime.now()));
+    _activityBloc.selectedCategorySubject.add(null);
+    _activityBloc.sortCriteriaController.add(SortCriteria.none);
+  }
 
-    _activityBloc.fetchExpenses();
+  Future<void> resetAndFetchData() async {
+    _clearSortAndFilter();
+    await _activityBloc.fetchExpenses();
   }
 
   @override
