@@ -84,22 +84,29 @@ class HomePageBloc extends BaseBloc {
     try {
       Query query = _fireStore.collection('expanse_income').where('type', isEqualTo: 'expense');
 
-      if (limit != null) {
-        query = query.limit(limit);
-      }
-
+      // Fetch all expenses
       QuerySnapshot querySnapshot = await query.get();
-      List<ExpanseIncomeModel> fetchedExpenses =
+      List<ExpanseIncomeModel> allExpenses =
           querySnapshot.docs.map((doc) => ExpanseIncomeModel.fromDocument(doc)).toList();
 
-      // Sort expenses in descending order by date
-      fetchedExpenses.sort((a, b) => DateTime.parse(b.date).compareTo(DateTime.parse(a.date)));
+      // Get the current month's expenses
+      DateTime now = DateTime.now();
+      DateTime startOfMonth = DateTime(now.year, now.month, 1);
+      DateTime endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-      if (limit != null && fetchedExpenses.length > limit) {
-        fetchedExpenses = fetchedExpenses.take(limit).toList();
+      List<ExpanseIncomeModel> currentMonthExpenses = allExpenses.where((expense) {
+        DateTime expenseDate = DateTime.parse(expense.date);
+        return expenseDate.isAfter(startOfMonth) && expenseDate.isBefore(endOfMonth);
+      }).toList();
+
+      // Sort expenses in ascending order by date
+      currentMonthExpenses.sort((a, b) => DateTime.parse(b.date).compareTo(DateTime.parse(a.date)));
+
+      if (limit != null && currentMonthExpenses.length > limit) {
+        expenses.add(currentMonthExpenses.take(limit).toList());
+      } else {
+        expenses.add(currentMonthExpenses);
       }
-
-      expenses.add(fetchedExpenses);
     } catch (e) {
       print('Error fetching expenses: $e');
     }
